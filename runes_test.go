@@ -798,4 +798,48 @@ func TestRuneRestrictions(t *testing.T) {
 	}
 }
 
+// TestRuneString whether we can create a rune and then successfully parse it
+func TestRuneString(t *testing.T) {
+	altOne, err := runes.NewAlternative("f1", "!", "")
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+	altTwo, err := runes.NewAlternative("f2", "=", "2")
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+	altThree, err := runes.NewAlternative("f3", ">", "2")
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+
+	secret := make([]byte, 32)
+	for i := range secret {
+		secret[i] = 0x01
+	}
+	newRune, err := runes.NewMasterRune(secret, "")
+	if err != nil {
+		t.Errorf("unexpected error when creating rune: %v", err)
+	}
+	err = newRune.AddRestriction(runes.Restriction{altOne, altTwo})
+	if err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	err = newRune.AddRestriction(runes.Restriction{altThree})
+	if err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+
+	runestr := newRune.Encode()
+
+	runeTwo, err := runes.NewRuneFromEncodedString(runestr)
+	if err != nil {
+		t.Errorf("unexpected error when creating rune from encoded rune string: %v", err)
+	}
+
+	if newRune.String() != runeTwo.String() {
+		t.Errorf("unexpected rune inequality: %s and %s", newRune.String(), runeTwo.String())
+	}
+}
+
 // TODO - Create full testing suite (Don't forget creating runes with alts in restrictions)
