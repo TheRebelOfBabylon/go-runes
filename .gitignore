@@ -19,3 +19,6 @@
 
 # Go workspace file
 go.work
+
+# the python module should be ignored
+runes/
