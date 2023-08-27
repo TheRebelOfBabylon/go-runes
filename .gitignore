@@ -22,3 +22,6 @@ go.work
 
 # the python module should be ignored
 runes/
+
+# asdf golang version control
+.tool-versions
