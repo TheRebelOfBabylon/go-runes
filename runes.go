@@ -36,6 +36,7 @@ var (
 	ErrInvalidRunePrefix     = errors.New("rune strings must start with 64 hex digits then '-'")
 	ErrSecretTooLarge        = errors.New("secret too large")
 	ErrCondValueTypeMismatch = errors.New("condition and test value type mismatch")
+	ErrUnauthorizedRune      = errors.New("unauthorized rune")
 	shaPrefix                = []byte{115, 104, 97, 3}
 )
 
@@ -411,6 +412,18 @@ func (r *Rune) IsRuneAuthorized(otherRune *Rune) bool {
 	newMarshal := hCopy.(encoding.BinaryMarshaler)
 	authbase, _ := newMarshal.MarshalBinary()
 	return bytes.Equal(otherRune.Authcode(), authbase[4:4+hCopy.Size()])
+}
+
+// Check checks if a given rune is authorized by the parent rune and passes the given tests
+func (r *Rune) Check(encodedRune string, tests map[string]Test) error {
+	newRune, err := NewRuneFromEncodedString(encodedRune)
+	if err != nil {
+		return err
+	}
+	if !r.IsRuneAuthorized(newRune) {
+		return ErrUnauthorizedRune
+	}
+	return newRune.AreRestrictionsMet(tests)
 }
 
 // NewRuneFromAuthcode creates a new rune from a given authcode and a list of restrictions
