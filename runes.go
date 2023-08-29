@@ -37,7 +37,7 @@ var (
 	ErrSecretTooLarge        = errors.New("secret too large")
 	ErrCondValueTypeMismatch = errors.New("condition and test value type mismatch")
 	ErrUnauthorizedRune      = errors.New("unauthorized rune")
-	shaPrefix                = []byte{115, 104, 97, 3}
+	shaPrefix                = "sha\x03"
 )
 
 func padlen64(x int) int {
@@ -341,6 +341,38 @@ func NewMasterRune(secret []byte, id string) (*Rune, error) {
 	return r, nil
 }
 
+// NewRuneFromAuthbase creates a new rune from a given authbase and list of restrictions
+func NewRuneFromAuthbase(authbase []byte, restrictions []Restriction) (*Rune, error) {
+	// append sha prefix and then unmarshal sha256 state into hash struct
+	base := make([]byte, 0, 108)
+	base = append(base, shaPrefix...)
+	base = append(base, authbase...)
+	base = base[:100]
+	base = binary.BigEndian.AppendUint64(base, uint64(len(authbase)+padlen64(len(authbase))))
+	h := sha256.New()
+	hBase := sha256.New()
+	unmarshaler := h.(encoding.BinaryUnmarshaler)
+	baseUnmarshaler := h.(encoding.BinaryUnmarshaler)
+	err := unmarshaler.UnmarshalBinary(base)
+	if err != nil {
+		return nil, err
+	}
+	err = baseUnmarshaler.UnmarshalBinary(base)
+	if err != nil {
+		return nil, err
+	}
+	r := &Rune{
+		hash:     h,
+		hashBase: hBase,
+	}
+	for _, restr := range restrictions {
+		if err = r.AddRestriction(restr); err != nil {
+			return nil, err
+		}
+	}
+	return r, nil
+}
+
 // AddRestrictions adds new restrictions to the rune
 func (r *Rune) AddRestriction(restriction Restriction) error {
 	if restriction.hasIdAlts() {
@@ -374,7 +406,7 @@ func (r *Rune) AreRestrictionsMet(tests map[string]Test) error {
 func (r *Rune) Authcode() []byte {
 	marshaler := r.hash.(encoding.BinaryMarshaler)
 	authcode, _ := marshaler.MarshalBinary()
-	return authcode[4 : 4+r.hash.Size()]
+	return authcode[4:36]
 }
 
 // String returns the string encoded version of the rune
@@ -416,7 +448,7 @@ func (r *Rune) IsRuneAuthorized(otherRune *Rune) bool {
 
 // Check checks if a given rune is authorized by the parent rune and passes the given tests
 func (r *Rune) Check(encodedRune string, tests map[string]Test) error {
-	newRune, err := NewRuneFromEncodedString(encodedRune)
+	newRune, err := RuneFromEncodedString(encodedRune)
 	if err != nil {
 		return err
 	}
@@ -426,12 +458,19 @@ func (r *Rune) Check(encodedRune string, tests map[string]Test) error {
 	return newRune.AreRestrictionsMet(tests)
 }
 
-// NewRuneFromAuthcode creates a new rune from a given authcode and a list of restrictions
-func NewRuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error) {
+// RuneFromAuthcode parses a rune from a given authcode and a list of restrictions
+func RuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error) {
 	// append sha prefix and then unmarshal sha256 state into hash struct
-	authbase := shaPrefix[:]
+	authbase := make([]byte, 0, 108)
+	authbase = append(authbase, shaPrefix...)
 	authbase = append(authbase, authcode...)
-	authbase = append(authbase, make([]byte, 108-len(authbase))...) // need to append the right amount of zeros to make a byte slice of 108 bytes
+	authbase = authbase[:100]
+	runeLength := len(authcode) + padlen64(len(authcode)) // may have to remove padlen64 of len(authcode)
+	for _, restr := range restrictions {
+		runeLength += len(restr.String())
+		runeLength += padlen64(runeLength)
+	}
+	authbase = binary.BigEndian.AppendUint64(authbase, uint64(runeLength))
 	h := sha256.New()
 	hBase := sha256.New()
 	unmarshaler := h.(encoding.BinaryUnmarshaler)
@@ -451,8 +490,8 @@ func NewRuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, er
 	}, nil
 }
 
-// NewRuneFromString creates a new rune from a rune string
-func NewRuneFromString(runeString string) (*Rune, error) {
+// RuneFromString parses a rune from a rune string
+func RuneFromString(runeString string) (*Rune, error) {
 	if len(runeString) < 64 || runeString[64] != ':' {
 		return nil, ErrInvalidRunePrefix
 	}
@@ -470,18 +509,18 @@ func NewRuneFromString(runeString string) (*Rune, error) {
 		restrictions = append(restrictions, restr)
 		restrStr = newRestrStr
 	}
-	newRune, err := NewRuneFromAuthcode(authbase, restrictions)
+	newRune, err := RuneFromAuthcode(authbase, restrictions)
 	if err != nil {
 		return nil, err
 	}
 	return newRune, nil
 }
 
-// NewRuneFromEncodedString creates a new rune from an encoded rune string
-func NewRuneFromEncodedString(encodedString string) (*Rune, error) {
+// RuneFromEncodedString parses a rune from an encoded rune string
+func RuneFromEncodedString(encodedString string) (*Rune, error) {
 	runeBytes, err := base64.StdEncoding.DecodeString(encodedString)
 	if err != nil {
 		return nil, err
 	}
-	return NewRuneFromString(hex.EncodeToString(runeBytes[:32]) + ":" + string(runeBytes[32:]))
+	return RuneFromString(hex.EncodeToString(runeBytes[:32]) + ":" + string(runeBytes[32:]))
 }
