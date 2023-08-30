@@ -1063,5 +1063,3 @@ func TestUniqueIdRestrictions(t *testing.T) {
 		t.Errorf("unexpected error when parsing rune: %v", err)
 	}
 }
-
-// TODO - Create full testing suite (Don't forget creating runes with alts in restrictions)

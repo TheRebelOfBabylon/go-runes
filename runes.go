@@ -44,6 +44,7 @@ var (
 	shaPrefix                = "sha\x03"
 )
 
+// padlen64 returnss the amount which will increase x until it's divisable by 64
 func padlen64(x int) int {
 	return (64 - (x % 64)) % 64
 }
@@ -181,6 +182,7 @@ func (a *Alternative) Test(tests map[string]Test) error {
 	}
 	// check if field exists in tests
 	if _, ok := tests[a.Field]; !ok {
+		// unique_id fields
 		if a.Field == "" {
 			if strings.Contains(a.Value, "-") {
 				return ErrIdUknownVersion
@@ -326,8 +328,6 @@ type Rune struct {
 	hashBase     hash.Hash // This hash struct only keeps the base state
 }
 
-// TODO - Add useful comments and doc strings
-
 // NewMasterRune creates a new master rune
 func NewMasterRune(secret []byte, id, version string) (*Rune, error) {
 	if len(secret)+1+8 > 64 {
@@ -389,6 +389,7 @@ func NewRuneFromAuthbase(authbase []byte, uniqueId, version string, restrictions
 		uniqueId: uniqueId,
 		version:  version,
 	}
+	// unique_id restrictions first
 	if uniqueId != "" {
 		restr, err := UniqueIdRestriction(uniqueId, version)
 		if err != nil {
