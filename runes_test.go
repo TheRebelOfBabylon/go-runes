@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -182,11 +183,11 @@ func TestNewRuneNoRestrictions(t *testing.T) {
 }
 
 func TestRuneFromEncodedStringNoRestrictions(t *testing.T) {
-	r, err := runes.RuneFromEncodedString("9mYTV1M/f+1ItTlhpZx5nZ11IxSKV+xQGQszIWoPNEM=")
+	r, err := runes.RuneFromEncodedString("KNb4MXVG7BwY8Zwuqh8L9SEiQEGhWs1VzHvVwMvNnYY=")
 	if err != nil {
 		t.Errorf("unexpected error decoding rune: %v", err)
 	}
-	if fmt.Sprintf("%x", r.Authcode()) != "f6661357533f7fed48b53961a59c799d9d7523148a57ec50190b33216a0f3443" {
+	if fmt.Sprintf("%x", r.Authcode()) != "28d6f8317546ec1c18f19c2eaa1f0bf521224041a15acd55cc7bd5c0cbcd9d86" {
 		t.Errorf("unexpected authcode: %x", r.Authcode())
 	}
 	t.Logf("rune: %s", r.String())
@@ -205,12 +206,12 @@ type encodedStrTestCases struct {
 var (
 	testCases = []encodedStrTestCases{
 		{
-			"rEhxxJJWN2NvUJ1LCEmE9rwhyK+GV16h6Cx270LIDPdpZD0xMjM0NTY3ODk=",
+			"rEhxxJJWN2NvUJ1LCEmE9rwhyK-GV16h6Cx270LIDPdpZD0xMjM0NTY3ODk=",
 			"ac4871c4925637636f509d4b084984f6bc21c8af86575ea1e82c76ef42c80cf7",
 			[]string{"id=123456789"},
 		},
 		{
-			"n+fwIGCj2Xaq3ws/q1nTIezNsUs3jk3wo222OdJAlaNpZD0xMjM0NTY3ODkmdGltZTwy",
+			"n-fwIGCj2Xaq3ws_q1nTIezNsUs3jk3wo222OdJAlaNpZD0xMjM0NTY3ODkmdGltZTwy",
 			"9fe7f02060a3d976aadf0b3fab59d321eccdb14b378e4df0a36db639d24095a3",
 			[]string{"id=123456789", "time<2"},
 		},
@@ -237,7 +238,7 @@ func TestRuneFromEncodedString(t *testing.T) {
 }
 
 func TestRuneFromEncodedStringThenAddRestriction(t *testing.T) {
-	r, err := runes.RuneFromEncodedString("rEhxxJJWN2NvUJ1LCEmE9rwhyK+GV16h6Cx270LIDPdpZD0xMjM0NTY3ODk=")
+	r, err := runes.RuneFromEncodedString("rEhxxJJWN2NvUJ1LCEmE9rwhyK-GV16h6Cx270LIDPdpZD0xMjM0NTY3ODk=")
 	if err != nil {
 		t.Errorf("unexpected error decoding rune: %v", err)
 	}
@@ -260,7 +261,7 @@ func TestRuneFromEncodedStringThenAddRestriction(t *testing.T) {
 	if fmt.Sprintf("%x", r.Authcode()) != "9fe7f02060a3d976aadf0b3fab59d321eccdb14b378e4df0a36db639d24095a3" {
 		t.Errorf("unexpected authcode: %x", r.Authcode())
 	}
-	if r.Encode() != "n+fwIGCj2Xaq3ws/q1nTIezNsUs3jk3wo222OdJAlaNpZD0xMjM0NTY3ODkmdGltZTwy" {
+	if r.Encode() != "n-fwIGCj2Xaq3ws_q1nTIezNsUs3jk3wo222OdJAlaNpZD0xMjM0NTY3ODkmdGltZTwy" {
 		t.Errorf("unexpected encoded rune: %s", r.Encode())
 	}
 	if len(r.Restrictions) != 2 {
@@ -871,6 +872,75 @@ func TestCheck(t *testing.T) {
 	}
 	if err = newRune.Check(runestr, map[string]runes.Test{"foo": {"baz", runes.StandardTestFunc}}); !errors.Is(err, runes.ErrUnauthorizedRune) {
 		t.Errorf("unexpected error when testing master rune: %v", err)
+	}
+}
+
+// TestFieldWithPunctuation tests that we can create runes with punctuation in the values
+func TestFieldWithPunctuation(t *testing.T) {
+	restr, err := runes.RestrictionFromString("foo=bar.baz")
+	if err != nil {
+		t.Errorf("unexpected error when creating restriction: %v", err)
+	}
+	mr, err := runes.NewMasterRune(make([]byte, 32), "")
+	if err != nil {
+		t.Errorf("unexpected error when creating rune: %v", err)
+	}
+	err = mr.AddRestriction(restr)
+	if err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+
+	newRune, err := runes.RuneFromEncodedString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error parsing encoded rune: %v", err)
+	}
+	if newRune.String() != mr.String() {
+		t.Errorf("unexpected result when comparing runes: %s and %s", newRune.String(), mr.String())
+	}
+
+	alt, err := runes.NewAlternative("foo", "=", runes.Punctuation)
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+	restrTwo := runes.Restriction{alt}
+	if restrTwo.String() != "foo="+strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(runes.Punctuation, "\\", "\\\\"), "|", "\\|"), "&", "\\&") {
+		t.Errorf("unexpected result comparing encoded restriction: %s", restrTwo.String())
+	}
+
+	err = mr.AddRestriction(restrTwo)
+	if err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	decodedBytes, err := base64.URLEncoding.DecodeString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error when base64 decoding rune: %v", err)
+	}
+	if string(decodedBytes[32:]) != "foo=bar.baz&foo="+strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(runes.Punctuation, "\\", "\\\\"), "|", "\\|"), "&", "\\&") {
+		t.Errorf("unexpected result when comparing decoded runes: %s", string(decodedBytes[32:]))
+	}
+
+	restrThree, err := runes.RestrictionFromString("foo=1")
+	if err != nil {
+		t.Errorf("unexpected error when creating restriction: %v", err)
+	}
+	err = mr.AddRestriction(restrThree)
+	if err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	decodedBytes, err = base64.URLEncoding.DecodeString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error when base64 decoding rune: %v", err)
+	}
+	if string(decodedBytes[32:]) != "foo=bar.baz&foo="+strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(runes.Punctuation, "\\", "\\\\"), "|", "\\|"), "&", "\\&")+"&foo=1" {
+		t.Errorf("unexpected result when comparing decoded runes: %s", string(decodedBytes[32:]))
+	}
+
+	mewRune, err := runes.RuneFromEncodedString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error when parsing encoded rune: %v", err)
+	}
+	if mewRune.String() != mr.String() {
+		t.Errorf("unexpected result when comparing runes: %s and %s", mewRune.String(), mr.String())
 	}
 }
 
