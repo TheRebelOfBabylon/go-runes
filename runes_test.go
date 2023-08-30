@@ -944,4 +944,27 @@ func TestFieldWithPunctuation(t *testing.T) {
 	}
 }
 
+// TestCustomTestFunc tests whether a custom test function behaves as expected
+func TestCustomTestFunc(t *testing.T) {
+	var (
+		callmePass runes.TestFunc = func(alt *runes.Alternative, v interface{}) error {
+			return nil
+		}
+		callmeFail runes.TestFunc = func(alt *runes.Alternative, v interface{}) error {
+			return errors.New("failed")
+		}
+	)
+
+	restr, err := runes.RestrictionFromString("callme=bar.baz")
+	if err != nil {
+		t.Errorf("unexpected error when parsing restriction: %v", err)
+	}
+	if err = restr.Test(map[string]runes.Test{"callme": {nil, callmePass}}); err != nil {
+		t.Errorf("unexpected error when testing restriction: %v", err)
+	}
+	if err = restr.Test(map[string]runes.Test{"callme": {nil, callmeFail}}); err == nil {
+		t.Error("expected error when testing restriction and got none")
+	}
+}
+
 // TODO - Create full testing suite (Don't forget creating runes with alts in restrictions)
