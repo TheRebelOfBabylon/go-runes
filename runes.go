@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	punctuation              = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+	Punctuation              = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 	validConditions          = "!=/^$~<>{}#"
 	ErrInvalidField          = errors.New("field not valid")
 	ErrInvalidCondition      = errors.New("condition not valid")
@@ -61,7 +61,7 @@ type Alternative struct {
 
 // NewAlternative creates a new Alternative
 func NewAlternative(field, cond, value string) (*Alternative, error) {
-	if strings.ContainsAny(field, punctuation) {
+	if strings.ContainsAny(field, Punctuation) {
 		return nil, ErrInvalidField
 	}
 	if !strings.ContainsAny(cond, validConditions) {
@@ -190,7 +190,7 @@ func decodeAlternative(encodedString string) (*Alternative, string, error) {
 		condition string
 	)
 	for endOff < len(encodedString) {
-		if strings.ContainsAny(string(encodedString[endOff]), punctuation) {
+		if strings.ContainsAny(string(encodedString[endOff]), Punctuation) {
 			condition = string(encodedString[endOff])
 			break
 		}
@@ -424,7 +424,7 @@ func (r *Rune) Encode() string {
 	for _, restriction := range r.Restrictions {
 		resStrs = append(resStrs, restriction.String())
 	}
-	return base64.StdEncoding.EncodeToString(append(r.Authcode(), []byte(strings.Join(resStrs, "&"))...))
+	return base64.URLEncoding.EncodeToString(append(r.Authcode(), []byte(strings.Join(resStrs, "&"))...))
 }
 
 // IsRuneAuthorized checks whether or not a given rune has been authorized by the master rune
@@ -518,7 +518,7 @@ func RuneFromString(runeString string) (*Rune, error) {
 
 // RuneFromEncodedString parses a rune from an encoded rune string
 func RuneFromEncodedString(encodedString string) (*Rune, error) {
-	runeBytes, err := base64.StdEncoding.DecodeString(encodedString)
+	runeBytes, err := base64.URLEncoding.DecodeString(encodedString)
 	if err != nil {
 		return nil, err
 	}
