@@ -31,14 +31,14 @@ var (
 	ErrWrongLexicOrder       = errors.New("wrong lexicographical order")
 	ErrNoRestrictions        = errors.New("no restrictions")
 	ErrNoOperator            = errors.New("restriction contains no operator")
-	ErrIdFieldHasAlts        = errors.New("id field can't have alternatives")
+	ErrIdFieldHasAlts        = errors.New("unique_id field can't have alternatives")
 	ErrExtraChars            = errors.New("restriction has extra ending characters")
 	ErrInvalidRunePrefix     = errors.New("rune strings must start with 64 hex digits then '-'")
 	ErrSecretTooLarge        = errors.New("secret too large")
 	ErrCondValueTypeMismatch = errors.New("condition and test value type mismatch")
 	ErrUnauthorizedRune      = errors.New("unauthorized rune")
 	ErrInvalidUniqueIdCond   = errors.New("unique_id condition must be '='")
-	ErrIdUknownVersion       = errors.New("id unknown version")
+	ErrIdUknownVersion       = errors.New("unique_id unknown version")
 	ErrIdHasHyphens          = errors.New("hyphen not allowed in unique_id")
 	ErrIdFieldForbidden      = errors.New("unique_id fiield not valid here")
 	shaPrefix                = "sha\x03"
@@ -326,6 +326,7 @@ type Rune struct {
 	version      string
 	hash         hash.Hash // This hash struct keeps the cumulative state with all added restrictions
 	hashBase     hash.Hash // This hash struct only keeps the base state
+	secLen       int
 }
 
 // NewMasterRune creates a new master rune
@@ -335,12 +336,11 @@ func NewMasterRune(secret []byte, id, version string) (*Rune, error) {
 	}
 	h := sha256.New()
 	hBase := sha256.New()
-	secret = append(secret, EndShastream(len(secret))...)
-	_, err := h.Write(secret)
+	_, err := h.Write(append(secret, EndShastream(len(secret))...))
 	if err != nil {
 		return nil, err
 	}
-	_, err = hBase.Write(secret)
+	_, err = hBase.Write(append(secret, EndShastream(len(secret))...))
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +349,7 @@ func NewMasterRune(secret []byte, id, version string) (*Rune, error) {
 		hashBase: hBase,
 		uniqueId: id,
 		version:  version,
+		secLen:   len(secret),
 	}
 	if id != "" {
 		restr, err := UniqueIdRestriction(id, version)
@@ -462,11 +463,15 @@ func (r *Rune) IsRuneAuthorized(otherRune *Rune) bool {
 	hCopy := sha256.New()
 	unmarshaler := hCopy.(encoding.BinaryUnmarshaler)
 	unmarshaler.UnmarshalBinary(state)
+	totlen := r.secLen
 	// update hash state with encoded restrictions
 	for _, restriction := range otherRune.Restrictions {
+		pad := EndShastream(totlen)
+		hCopy.Write(pad)
+		totlen += len(pad)
 		encodedRes := []byte(restriction.String())
 		hCopy.Write(encodedRes)
-		hCopy.Write(EndShastream(len(encodedRes)))
+		totlen += len(encodedRes)
 	}
 	newMarshal := hCopy.(encoding.BinaryMarshaler)
 	authbase, _ := newMarshal.MarshalBinary()

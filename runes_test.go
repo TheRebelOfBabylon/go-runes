@@ -134,8 +134,8 @@ func TestRuneAuth(t *testing.T) {
 	if !masterRune.IsRuneAuthorized(newRune) {
 		t.Errorf("unexpected result when checking if the new rune has the proper restricitons and authcode: %s and %s", newRuneWithRes.String(), masterRune.String())
 	}
-	// old runes are still valid. This stuff is magic
-	if !masterRune.IsRuneAuthorized(newRuneWithRes) {
+	// old runes are not valid
+	if masterRune.IsRuneAuthorized(newRuneWithRes) {
 		t.Errorf("unexpected result when checking if the new rune has the proper restricitons and authcode: %s and %s", newRuneWithRes.String(), masterRune.String())
 	}
 }
@@ -853,7 +853,7 @@ func TestCheck(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error when creating restriction: %v", err)
 	}
-	newRune, err := runes.NewRuneFromAuthbase(masterRune.Authcode(), "", "", []runes.Restriction{restr})
+	newRune, err := runes.RuneFromAuthcode(masterRune.Authcode(), []runes.Restriction{restr})
 	if err != nil {
 		t.Errorf("unexpected error when creating rune from authcode: %v", err)
 	}
