@@ -47,7 +47,7 @@ func checkAuthSha(secret []byte, restrictions []runes.Restriction) []byte {
 func TestRuneAuth(t *testing.T) {
 	// create master rune
 	secret := make([]byte, 16)
-	masterRune, err := runes.NewMasterRune(secret, "")
+	masterRune, err := runes.NewMasterRune(secret, "", "")
 	if err != nil {
 		t.Errorf("unexpected error when creating master rune: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestRuneAuth(t *testing.T) {
 
 func TestNewRuneWithId(t *testing.T) {
 	secret := make([]byte, 32)
-	r, err := runes.NewMasterRune(secret, "123456789")
+	r, err := runes.NewMasterRune(secret, "123456789", "")
 	if err != nil {
 		t.Errorf("unexpected error creating rune: %v", err)
 	}
@@ -153,11 +153,11 @@ func TestNewRuneWithId(t *testing.T) {
 
 func TestNewRuneWithRestrictions(t *testing.T) {
 	secret := make([]byte, 32)
-	r, err := runes.NewMasterRune(secret, "123456789")
+	r, err := runes.NewMasterRune(secret, "123456789", "")
 	if err != nil {
 		t.Errorf("unexpected error creating rune: %v", err)
 	}
-	restriction, err := runes.RestrictionFromString("time < 2")
+	restriction, err := runes.RestrictionFromString("time < 2", false)
 	if err != nil {
 		t.Errorf("unexpected error creating restriction: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestNewRuneWithRestrictions(t *testing.T) {
 func TestNewRuneNoRestrictions(t *testing.T) {
 	secret := make([]byte, 32)
 	_, _ = rand.Read(secret)
-	r, err := runes.NewMasterRune(secret, "")
+	r, err := runes.NewMasterRune(secret, "", "")
 	if err != nil {
 		t.Errorf("unexpected error creating new rune: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestRuneFromEncodedStringThenAddRestriction(t *testing.T) {
 		t.Errorf("Unexpected number of restrictions in rune %v", len(r.Restrictions))
 	}
 	// Now add restriction
-	restriction, err := runes.RestrictionFromString("time < 2")
+	restriction, err := runes.RestrictionFromString("time < 2", false)
 	if err != nil {
 		t.Errorf("Unexpected error when creating restriction: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestRuneFromEncodedStringThenAddRestriction(t *testing.T) {
 
 // TestRuneAlternatives tests that alternatives are interpreted as expected
 func TestRuneAlternatives(t *testing.T) {
-	alt, err := runes.NewAlternative("f1", "!", "")
+	alt, err := runes.NewAlternative("f1", "!", "", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "=", "1")
+	alt, err = runes.NewAlternative("f1", "=", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "/", "1")
+	alt, err = runes.NewAlternative("f1", "/", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "$", "1")
+	alt, err = runes.NewAlternative("f1", "$", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "^", "1")
+	alt, err = runes.NewAlternative("f1", "^", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "~", "1")
+	alt, err = runes.NewAlternative("f1", "~", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "<", "1")
+	alt, err = runes.NewAlternative("f1", "<", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "<", "x")
+	alt, err = runes.NewAlternative("f1", "<", "x", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -496,7 +496,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", ">", "1")
+	alt, err = runes.NewAlternative("f1", ">", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -541,7 +541,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", ">", "x")
+	alt, err = runes.NewAlternative("f1", ">", "x", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -554,7 +554,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "{", "1")
+	alt, err = runes.NewAlternative("f1", "{", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "}", "1")
+	alt, err = runes.NewAlternative("f1", "}", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -628,7 +628,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 
-	alt, err = runes.NewAlternative("f1", "#", "1")
+	alt, err = runes.NewAlternative("f1", "#", "1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -668,11 +668,11 @@ func TestRuneAlternatives(t *testing.T) {
 
 // TestRuneRestriction tests a restriction with more than one alternative for expected behaviour
 func TestRuneRestriction(t *testing.T) {
-	altOne, err := runes.NewAlternative("f1", "!", "")
+	altOne, err := runes.NewAlternative("f1", "!", "", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
-	altTwo, err := runes.NewAlternative("f2", "=", "2")
+	altTwo, err := runes.NewAlternative("f2", "=", "2", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -703,16 +703,16 @@ func TestRuneRestriction(t *testing.T) {
 
 // TestRuneRestrictions checks to see if a rune with multiple restrictions with one or more alternatives behaves expectedly
 func TestRuneRestrictions(t *testing.T) {
-	altOne, err := runes.NewAlternative("f1", "!", "")
+	altOne, err := runes.NewAlternative("f1", "!", "", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
-	altTwo, err := runes.NewAlternative("f2", "=", "2")
+	altTwo, err := runes.NewAlternative("f2", "=", "2", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
 
-	newRune, err := runes.NewMasterRune(make([]byte, 32), "")
+	newRune, err := runes.NewMasterRune(make([]byte, 32), "", "")
 	if err != nil {
 		t.Errorf("unexpected error when creating rune: %v", err)
 	}
@@ -741,7 +741,7 @@ func TestRuneRestrictions(t *testing.T) {
 		t.Errorf("unexpected error when testing rune: %v", err)
 	}
 
-	altThree, err := runes.NewAlternative("f3", ">", "2")
+	altThree, err := runes.NewAlternative("f3", ">", "2", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -801,15 +801,15 @@ func TestRuneRestrictions(t *testing.T) {
 
 // TestRuneString whether we can create a rune and then successfully parse it
 func TestRuneString(t *testing.T) {
-	altOne, err := runes.NewAlternative("f1", "!", "")
+	altOne, err := runes.NewAlternative("f1", "!", "", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
-	altTwo, err := runes.NewAlternative("f2", "=", "2")
+	altTwo, err := runes.NewAlternative("f2", "=", "2", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
-	altThree, err := runes.NewAlternative("f3", ">", "2")
+	altThree, err := runes.NewAlternative("f3", ">", "2", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -818,7 +818,7 @@ func TestRuneString(t *testing.T) {
 	for i := range secret {
 		secret[i] = 0x01
 	}
-	newRune, err := runes.NewMasterRune(secret, "")
+	newRune, err := runes.NewMasterRune(secret, "", "")
 	if err != nil {
 		t.Errorf("unexpected error when creating rune: %v", err)
 	}
@@ -845,15 +845,15 @@ func TestRuneString(t *testing.T) {
 
 // TestCheck tests the Check method of the Rune struct
 func TestCheck(t *testing.T) {
-	masterRune, err := runes.NewMasterRune(make([]byte, 16), "")
+	masterRune, err := runes.NewMasterRune(make([]byte, 16), "", "")
 	if err != nil {
 		t.Errorf("unexpected error when creating rune: %v", err)
 	}
-	restr, err := runes.RestrictionFromString("foo=bar")
+	restr, err := runes.RestrictionFromString("foo=bar", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating restriction: %v", err)
 	}
-	newRune, err := runes.NewRuneFromAuthbase(masterRune.Authcode(), []runes.Restriction{restr})
+	newRune, err := runes.NewRuneFromAuthbase(masterRune.Authcode(), "", "", []runes.Restriction{restr})
 	if err != nil {
 		t.Errorf("unexpected error when creating rune from authcode: %v", err)
 	}
@@ -877,11 +877,11 @@ func TestCheck(t *testing.T) {
 
 // TestFieldWithPunctuation tests that we can create runes with punctuation in the values
 func TestFieldWithPunctuation(t *testing.T) {
-	restr, err := runes.RestrictionFromString("foo=bar.baz")
+	restr, err := runes.RestrictionFromString("foo=bar.baz", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating restriction: %v", err)
 	}
-	mr, err := runes.NewMasterRune(make([]byte, 32), "")
+	mr, err := runes.NewMasterRune(make([]byte, 32), "", "")
 	if err != nil {
 		t.Errorf("unexpected error when creating rune: %v", err)
 	}
@@ -898,7 +898,7 @@ func TestFieldWithPunctuation(t *testing.T) {
 		t.Errorf("unexpected result when comparing runes: %s and %s", newRune.String(), mr.String())
 	}
 
-	alt, err := runes.NewAlternative("foo", "=", runes.Punctuation)
+	alt, err := runes.NewAlternative("foo", "=", runes.Punctuation, false)
 	if err != nil {
 		t.Errorf("unexpected error when creating alternative: %v", err)
 	}
@@ -919,7 +919,7 @@ func TestFieldWithPunctuation(t *testing.T) {
 		t.Errorf("unexpected result when comparing decoded runes: %s", string(decodedBytes[32:]))
 	}
 
-	restrThree, err := runes.RestrictionFromString("foo=1")
+	restrThree, err := runes.RestrictionFromString("foo=1", false)
 	if err != nil {
 		t.Errorf("unexpected error when creating restriction: %v", err)
 	}
@@ -955,7 +955,7 @@ func TestCustomTestFunc(t *testing.T) {
 		}
 	)
 
-	restr, err := runes.RestrictionFromString("callme=bar.baz")
+	restr, err := runes.RestrictionFromString("callme=bar.baz", false)
 	if err != nil {
 		t.Errorf("unexpected error when parsing restriction: %v", err)
 	}
@@ -964,6 +964,103 @@ func TestCustomTestFunc(t *testing.T) {
 	}
 	if err = restr.Test(map[string]runes.Test{"callme": {nil, callmeFail}}); err == nil {
 		t.Error("expected error when testing restriction and got none")
+	}
+}
+
+// TestIdRestriction tests the ID restriction can be created and behaves as expected
+func TestIdRestriction(t *testing.T) {
+	mr, err := runes.NewMasterRune(make([]byte, 16), "1", "")
+	if err != nil {
+		t.Errorf("unexpected error when creating rune with id: %v", err)
+	}
+	if len(mr.Restrictions) != 1 {
+		t.Errorf("unexpected result when checking length of restrictions: %v", len(mr.Restrictions))
+	}
+	if mr.Restrictions[0].String() != "=1" {
+		t.Errorf("unexpected result when checking encoded restriction: %s", mr.Restrictions[0].String())
+	}
+
+	if err = mr.AreRestrictionsMet(make(map[string]runes.Test)); err != nil {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+
+	if err = mr.AreRestrictionsMet(map[string]runes.Test{"": {"1", runes.StandardTestFunc}}); err != nil {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+	if err = mr.AreRestrictionsMet(map[string]runes.Test{"": {"2", runes.StandardTestFunc}}); !errors.Is(err, runes.ErrForbiddenValue) {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+
+	mr2, err := runes.NewMasterRune(make([]byte, 16), "1", "2")
+	if err != nil {
+		t.Errorf("unexpected error when creating rune with id: %v", err)
+	}
+	if len(mr2.Restrictions) != 1 {
+		t.Errorf("unexpected result when checking length of restrictions: %v", len(mr.Restrictions))
+	}
+	if mr2.Restrictions[0].String() != "=1-2" {
+		t.Errorf("unexpected result when checking encoded restriction: %s", mr.Restrictions[0].String())
+	}
+
+	if err = mr2.AreRestrictionsMet(make(map[string]runes.Test)); !errors.Is(err, runes.ErrIdUknownVersion) {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+
+	if err = mr2.AreRestrictionsMet(map[string]runes.Test{"": {"1", runes.StandardTestFunc}}); !errors.Is(err, runes.ErrForbiddenValue) {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+	if err = mr2.AreRestrictionsMet(map[string]runes.Test{"": {"1-2", runes.StandardTestFunc}}); err != nil {
+		t.Errorf("unexpected error when checking if rune restrictions are met: %v", err)
+	}
+}
+
+// TestUniqueIdRestrictions tests if unique_id restrictions behave as expected
+func TestUniqueIdRestrictions(t *testing.T) {
+	secret := make([]byte, 16)
+	mr, err := runes.NewMasterRune(secret, "1", "")
+	if err != nil {
+		t.Errorf("unexpected error when creating new rune: %v", err)
+	}
+	alt, err := runes.NewAlternative("", "=", "2", true)
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+
+	mr2, err := runes.RuneFromEncodedString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error when parsing rune: %v", err)
+	}
+	if err = mr2.AddRestriction(runes.Restriction{alt}); err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	if _, err = runes.RuneFromEncodedString(mr2.Encode()); !errors.Is(err, runes.ErrIdFieldForbidden) {
+		t.Errorf("unexpected error when parsing rune: %v", err)
+	}
+
+	mr3, err := runes.RuneFromEncodedString(mr.Encode())
+	if err != nil {
+		t.Errorf("unexpected error when parsing rune: %v", err)
+	}
+	for _, cond := range []string{"!", "/", "^", "$", "~", "<", ">", "{", "}", "#"} {
+		mr3.Restrictions[0][0].Condition = cond
+		if _, err = runes.RuneFromEncodedString(mr3.Encode()); !errors.Is(err, runes.ErrInvalidUniqueIdCond) {
+			t.Errorf("unexpected error when parsing rune: %v", err)
+		}
+	}
+
+	newRune, err := runes.NewMasterRune(make([]byte, 16), "", "")
+	if err != nil {
+		t.Errorf("unexpected error when creating rune: %v", err)
+	}
+	alt2, err := runes.NewAlternative("f", "=", "1", false)
+	if err != nil {
+		t.Errorf("unexpected error when creating alternative: %v", err)
+	}
+	if err = newRune.AddRestriction(runes.Restriction{alt, alt2}); err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	if _, err = runes.RuneFromEncodedString(newRune.Encode()); !errors.Is(err, runes.ErrIdFieldHasAlts) {
+		t.Errorf("unexpected error when parsing rune: %v", err)
 	}
 }
 

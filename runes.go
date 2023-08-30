@@ -37,6 +37,10 @@ var (
 	ErrSecretTooLarge        = errors.New("secret too large")
 	ErrCondValueTypeMismatch = errors.New("condition and test value type mismatch")
 	ErrUnauthorizedRune      = errors.New("unauthorized rune")
+	ErrInvalidUniqueIdCond   = errors.New("unique_id condition must be '='")
+	ErrIdUknownVersion       = errors.New("id unknown version")
+	ErrIdHasHyphens          = errors.New("hyphen not allowed in unique_id")
+	ErrIdFieldForbidden      = errors.New("unique_id fiield not valid here")
 	shaPrefix                = "sha\x03"
 )
 
@@ -60,12 +64,19 @@ type Alternative struct {
 }
 
 // NewAlternative creates a new Alternative
-func NewAlternative(field, cond, value string) (*Alternative, error) {
+func NewAlternative(field, cond, value string, allowIdField bool) (*Alternative, error) {
 	if strings.ContainsAny(field, Punctuation) {
 		return nil, ErrInvalidField
 	}
 	if !strings.ContainsAny(cond, validConditions) {
 		return nil, ErrInvalidCondition
+	}
+	if field == "" {
+		if cond != "=" {
+			return nil, ErrInvalidUniqueIdCond
+		} else if !allowIdField {
+			return nil, ErrIdFieldForbidden
+		}
 	}
 	return &Alternative{
 		Field:     field,
@@ -170,6 +181,12 @@ func (a *Alternative) Test(tests map[string]Test) error {
 	}
 	// check if field exists in tests
 	if _, ok := tests[a.Field]; !ok {
+		if a.Field == "" {
+			if strings.Contains(a.Value, "-") {
+				return ErrIdUknownVersion
+			}
+			return nil
+		}
 		if a.Condition == "!" {
 			return nil
 		}
@@ -184,7 +201,7 @@ func (a *Alternative) String() string {
 }
 
 // decodeAlternative pulls alternatives from encoded string and returns the remainder
-func decodeAlternative(encodedString string) (*Alternative, string, error) {
+func decodeAlternative(encodedString string, allowIdField bool) (*Alternative, string, error) {
 	var (
 		endOff    int
 		condition string
@@ -217,7 +234,8 @@ loop:
 		value += string(encodedString[endOff])
 		endOff += 1
 	}
-	return &Alternative{Field: field, Condition: condition, Value: value}, string(encodedString[endOff:]), nil
+	alt, err := NewAlternative(field, condition, value, allowIdField)
+	return alt, string(encodedString[endOff:]), err
 }
 
 type Restriction []*Alternative
@@ -236,51 +254,37 @@ func (r Restriction) Test(tests map[string]Test) error {
 	return bigErr
 }
 
-// hasIdAlts checks if there are multiple alternatives for the id field
-func (r Restriction) hasIdAlts() bool {
-	var cnt int
-	for _, alt := range r {
-		// we can potentially end the loop early by repeatedly checking
-		if cnt > 1 {
-			return true
-		}
-		if alt.Field == "id" {
-			cnt += 1
-		}
-	}
-	return cnt > 1
-}
-
 // decodeRestriction pulls restrictions from encoded strings
-func decodeRestriction(encodedString string) (Restriction, string, error) {
+func decodeRestriction(encodedString string, allowIdField bool) (Restriction, string, error) {
 	var alts Restriction
 	for len(encodedString) != 0 {
 		if strings.HasPrefix(encodedString, "&") {
 			encodedString = string(encodedString[1:])
 			break
 		}
-		alt, newEncodedString, err := decodeAlternative(encodedString)
+		alt, newEncodedString, err := decodeAlternative(encodedString, allowIdField)
 		if err != nil {
 			return nil, "", err
 		}
 		alts = append(alts, alt)
 		encodedString = newEncodedString
+		allowIdField = false // id fields aren't allowed after the first alternative
 	}
-	if alts.hasIdAlts() {
+	if len(alts) > 1 && alts[0].Field == "" {
 		return nil, "", ErrIdFieldHasAlts
 	}
 	return alts, encodedString, nil
 }
 
 // RestrictionFromString creates restrictions from an escaped string
-func RestrictionFromString(encodedString string) (Restriction, error) {
+func RestrictionFromString(encodedString string, allowIdField bool) (Restriction, error) {
 	encodedString = strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
 			return -1
 		}
 		return r
 	}, encodedString)
-	restriction, remainder, err := decodeRestriction(encodedString)
+	restriction, remainder, err := decodeRestriction(encodedString, allowIdField)
 	if err != nil {
 		return nil, err
 	}
@@ -299,9 +303,25 @@ func (r Restriction) String() string {
 	return strings.Join(altStrings, "|")
 }
 
+// UniqueIdRestriction creates a unique Id restriction
+func UniqueIdRestriction(id, version string) (Restriction, error) {
+	if strings.Contains(id, "-") {
+		return nil, ErrIdHasHyphens
+	}
+	if version != "" {
+		id += fmt.Sprintf("-%s", version)
+	}
+	alt, err := NewAlternative("", "=", id, true)
+	if err != nil {
+		return nil, err
+	}
+	return Restriction{alt}, nil
+}
+
 type Rune struct {
 	Restrictions []Restriction
 	uniqueId     string
+	version      string
 	hash         hash.Hash // This hash struct keeps the cumulative state with all added restrictions
 	hashBase     hash.Hash // This hash struct only keeps the base state
 }
@@ -309,7 +329,7 @@ type Rune struct {
 // TODO - Add useful comments and doc strings
 
 // NewMasterRune creates a new master rune
-func NewMasterRune(secret []byte, id string) (*Rune, error) {
+func NewMasterRune(secret []byte, id, version string) (*Rune, error) {
 	if len(secret)+1+8 > 64 {
 		return nil, ErrSecretTooLarge
 	}
@@ -327,9 +347,11 @@ func NewMasterRune(secret []byte, id string) (*Rune, error) {
 	r := &Rune{
 		hash:     h,
 		hashBase: hBase,
+		uniqueId: id,
+		version:  version,
 	}
 	if id != "" {
-		restr, err := RestrictionFromString(fmt.Sprintf("id=%s", id))
+		restr, err := UniqueIdRestriction(id, version)
 		if err != nil {
 			return nil, err
 		}
@@ -342,7 +364,7 @@ func NewMasterRune(secret []byte, id string) (*Rune, error) {
 }
 
 // NewRuneFromAuthbase creates a new rune from a given authbase and list of restrictions
-func NewRuneFromAuthbase(authbase []byte, restrictions []Restriction) (*Rune, error) {
+func NewRuneFromAuthbase(authbase []byte, uniqueId, version string, restrictions []Restriction) (*Rune, error) {
 	// append sha prefix and then unmarshal sha256 state into hash struct
 	base := make([]byte, 0, 108)
 	base = append(base, shaPrefix...)
@@ -364,6 +386,18 @@ func NewRuneFromAuthbase(authbase []byte, restrictions []Restriction) (*Rune, er
 	r := &Rune{
 		hash:     h,
 		hashBase: hBase,
+		uniqueId: uniqueId,
+		version:  version,
+	}
+	if uniqueId != "" {
+		restr, err := UniqueIdRestriction(uniqueId, version)
+		if err != nil {
+			return nil, err
+		}
+		err = r.AddRestriction(restr)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for _, restr := range restrictions {
 		if err = r.AddRestriction(restr); err != nil {
@@ -375,14 +409,6 @@ func NewRuneFromAuthbase(authbase []byte, restrictions []Restriction) (*Rune, er
 
 // AddRestrictions adds new restrictions to the rune
 func (r *Rune) AddRestriction(restriction Restriction) error {
-	if restriction.hasIdAlts() {
-		return ErrIdFieldHasAlts
-	}
-	for _, alt := range restriction {
-		if alt.Field == "id" && r.uniqueId != "" {
-			r.uniqueId = alt.Value
-		}
-	}
 	r.Restrictions = append(r.Restrictions, restriction)
 	_, err := r.hash.Write([]byte(restriction.String()))
 	if err != nil {
@@ -501,13 +527,15 @@ func RuneFromString(runeString string) (*Rune, error) {
 	}
 	restrStr := string(runeString[65:])
 	var restrictions []Restriction
+	allowIdField := true // allow id field at the front
 	for len(restrStr) != 0 {
-		restr, newRestrStr, err := decodeRestriction(restrStr)
+		restr, newRestrStr, err := decodeRestriction(restrStr, allowIdField)
 		if err != nil {
 			return nil, err
 		}
 		restrictions = append(restrictions, restr)
 		restrStr = newRestrStr
+		allowIdField = false
 	}
 	newRune, err := RuneFromAuthcode(authbase, restrictions)
 	if err != nil {
