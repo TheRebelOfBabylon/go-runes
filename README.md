@@ -102,8 +102,6 @@ the default handler will fail any cookie that has a version field
 The rune unmarshalling code ensures that if an empty parameter exists,
 it's the first one, and it's of a valid form.
 
-See [examples/blacklist.py](examples/blacklist.py).
-
 
 ## API Example
 
