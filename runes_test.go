@@ -34,13 +34,13 @@ func checkAuthSha(secret []byte, restrictions []runes.Restriction) []byte {
 	for _, restriction := range restrictions {
 		encodedRes := []byte(restriction.String())
 		stream = append(stream, encodedRes...)
-		stream = append(stream, endShastreamSimple(len(encodedRes))...)
+		stream = append(stream, endShastreamSimple(len(stream))...)
 	}
 	h := sha256.New()
 	_, _ = h.Write(stream)
 	marshaler := h.(encoding.BinaryMarshaler)
 	state, _ := marshaler.MarshalBinary()
-	return state[4 : 4+h.Size()]
+	return state[4:36]
 }
 
 // TestRuneAuth
@@ -100,7 +100,7 @@ func TestRuneAuth(t *testing.T) {
 	}
 	// manually check the master rune authcode
 	if !bytes.Equal(checkAuthSha(secret, []runes.Restriction{newRestriction, longRestriction}), masterRune.Authcode()) {
-		t.Error("unexpected result when manually checking the master rune authcode")
+		t.Errorf("unexpected result when manually checking the master rune authcode: %x and %x", masterRune.Authcode(), checkAuthSha(secret, []runes.Restriction{newRestriction, longRestriction}))
 	}
 	newRune, err = runes.RuneFromAuthcode(masterRune.Authcode(), []runes.Restriction{newRestriction})
 	if err != nil {
@@ -134,8 +134,8 @@ func TestRuneAuth(t *testing.T) {
 	if !masterRune.IsRuneAuthorized(newRune) {
 		t.Errorf("unexpected result when checking if the new rune has the proper restricitons and authcode: %s and %s", newRuneWithRes.String(), masterRune.String())
 	}
-	// old runes are not valid
-	if masterRune.IsRuneAuthorized(newRuneWithRes) {
+	// old runes are still valid
+	if !masterRune.IsRuneAuthorized(newRuneWithRes) {
 		t.Errorf("unexpected result when checking if the new rune has the proper restricitons and authcode: %s and %s", newRuneWithRes.String(), masterRune.String())
 	}
 }
@@ -258,10 +258,10 @@ func TestRuneFromEncodedStringThenAddRestriction(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when adding restriction: %v", err)
 	}
-	if fmt.Sprintf("%x", r.Authcode()) != "9fe7f02060a3d976aadf0b3fab59d321eccdb14b378e4df0a36db639d24095a3" {
+	if fmt.Sprintf("%x", r.Authcode()) != "a1da779735fe0fbf503e0f6d7698450d6b1e2796ccaf1ef7877eb6eb66d1f82a" {
 		t.Errorf("unexpected authcode: %x", r.Authcode())
 	}
-	if r.Encode() != "n-fwIGCj2Xaq3ws_q1nTIezNsUs3jk3wo222OdJAlaNpZD0xMjM0NTY3ODkmdGltZTwy" {
+	if r.Encode() != "odp3lzX-D79QPg9tdphFDWseJ5bMrx73h36262bR-CppZD0xMjM0NTY3ODkmdGltZTwy" {
 		t.Errorf("unexpected encoded rune: %s", r.Encode())
 	}
 	if len(r.Restrictions) != 2 {
@@ -447,7 +447,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {"1", runes.StandardTestFunc}})
-	if !errors.Is(err, runes.ErrCondValueTypeMismatch) {
+	if !errors.Is(err, runes.ErrValueTooLarge) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {1, runes.StandardTestFunc}})
@@ -479,7 +479,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {"x", runes.StandardTestFunc}})
-	if !errors.Is(err, runes.ErrCondValueTypeMismatch) {
+	if !errors.Is(err, strconv.ErrSyntax) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 
@@ -505,7 +505,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {"1", runes.StandardTestFunc}})
-	if !errors.Is(err, runes.ErrCondValueTypeMismatch) {
+	if !errors.Is(err, runes.ErrValueTooSmall) {
 		t.Errorf("unexpected error when testing alternative: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {1, runes.StandardTestFunc}})
@@ -537,7 +537,7 @@ func TestRuneAlternatives(t *testing.T) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 	err = alt.Test(map[string]runes.Test{"f1": {"x", runes.StandardTestFunc}})
-	if !errors.Is(err, runes.ErrCondValueTypeMismatch) {
+	if !errors.Is(err, strconv.ErrSyntax) {
 		t.Errorf("unexpected error when testing alterntive: %v", err)
 	}
 
@@ -853,7 +853,7 @@ func TestCheck(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error when creating restriction: %v", err)
 	}
-	newRune, err := runes.RuneFromAuthcode(masterRune.Authcode(), []runes.Restriction{restr})
+	newRune, err := runes.NewRuneFromAuthbase(masterRune.Authcode(), "", "", []runes.Restriction{restr})
 	if err != nil {
 		t.Errorf("unexpected error when creating rune from authcode: %v", err)
 	}
@@ -1061,5 +1061,46 @@ func TestUniqueIdRestrictions(t *testing.T) {
 	}
 	if _, err = runes.RuneFromEncodedString(newRune.Encode()); !errors.Is(err, runes.ErrIdFieldHasAlts) {
 		t.Errorf("unexpected error when parsing rune: %v", err)
+	}
+}
+
+// TestCheckWithNoMasterRune ensures checking runes derived from non master runes can still be checked against the master rune and not intermediate runes
+func TestCheckWithNotMasterRune(t *testing.T) {
+	mr, err := runes.NewMasterRune(make([]byte, 16), "", "")
+	if err != nil {
+		t.Errorf("unexpected error when creating master rune: %v", err)
+	}
+	restr, err := runes.RestrictionFromString("f1=1", false)
+	if err != nil {
+		t.Errorf("unexpected error when creating restriction: %v", err)
+	}
+	if err = mr.AddRestriction(restr); err != nil {
+		t.Errorf("unexpected error when adding restriction to master rune: %v", err)
+	}
+	restr2, err := runes.RestrictionFromString("f2=69", false)
+	if err != nil {
+		t.Errorf("unexpected error when creating restriction: %v", err)
+	}
+	newRune, err := runes.RuneFromAuthcode(mr.Authcode(), []runes.Restriction{restr})
+	if err != nil {
+		t.Errorf("unexpected error when creating rune from authbase: %v", err)
+	}
+	if err = mr.Check(newRune.Encode(), map[string]runes.Test{"f1": {"1", runes.StandardTestFunc}}); err != nil {
+		t.Errorf("unexpected error when checking new rune against master rune: %v", err)
+	}
+	if err = newRune.AddRestriction(restr2); err != nil {
+		t.Errorf("unexpected error when adding restriction to rune: %v", err)
+	}
+	rune2, err := runes.RuneFromAuthcode(newRune.Authcode(), []runes.Restriction{restr, restr2})
+	if err != nil {
+		t.Errorf("unexpected error when deriving new rune from non master rune: %v", err)
+	}
+	// non master runes can't derive other runes and those runes be validated against it
+	if err = newRune.Check(rune2.Encode(), map[string]runes.Test{"f1": {"1", runes.StandardTestFunc}, "f2": {"69", runes.StandardTestFunc}}); !errors.Is(err, runes.ErrUnauthorizedRune) {
+		t.Errorf("unexpected error when checking new rune against non master rune: %v", err)
+	}
+	// but they can be validated against master rune
+	if err = mr.Check(rune2.Encode(), map[string]runes.Test{"f1": {"1", runes.StandardTestFunc}, "f2": {"69", runes.StandardTestFunc}}); err != nil {
+		t.Errorf("unexpected error when checking new rune against non master rune: %v", err)
 	}
 }

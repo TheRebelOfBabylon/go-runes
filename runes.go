@@ -130,6 +130,30 @@ var StandardTestFunc TestFunc = func(alt *Alternative, v interface{}) error {
 			if !(value > alt.Value) {
 				return fmt.Errorf("%s: %w", alt.Value, ErrWrongLexicOrder)
 			}
+		case "<":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			vInt, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if !(vInt < valueAsInt) {
+				return fmt.Errorf("%s: %w", alt.Value, ErrValueTooLarge)
+			}
+		case ">":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			vInt, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if !(vInt > valueAsInt) {
+				return fmt.Errorf("%s: %w", alt.Value, ErrValueTooSmall)
+			}
 		default:
 			return fmt.Errorf("%s & %T: %w", alt.Condition, value, ErrCondValueTypeMismatch)
 		}
@@ -165,6 +189,43 @@ var StandardTestFunc TestFunc = func(alt *Alternative, v interface{}) error {
 				return fmt.Errorf("%s: %w", alt.Value, err)
 			}
 			if !(int64(value) > valueAsInt) {
+				return fmt.Errorf("%s: %w", alt.Value, ErrValueTooSmall)
+			}
+		default:
+			return fmt.Errorf("%s & %T: %w", alt.Condition, value, ErrCondValueTypeMismatch)
+		}
+	case int64:
+		switch alt.Condition {
+		case "=":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if value != valueAsInt {
+				return fmt.Errorf("%s: %w", alt.Value, ErrForbiddenValue)
+			}
+		case "/":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if value == valueAsInt {
+				return fmt.Errorf("%s: %w", alt.Value, ErrForbiddenValue)
+			}
+		case "<":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if !(value < valueAsInt) {
+				return fmt.Errorf("%s: %w", alt.Value, ErrValueTooLarge)
+			}
+		case ">":
+			valueAsInt, err := strconv.ParseInt(alt.Value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("%s: %w", alt.Value, err)
+			}
+			if !(value > valueAsInt) {
 				return fmt.Errorf("%s: %w", alt.Value, ErrValueTooSmall)
 			}
 		default:
@@ -327,6 +388,7 @@ type Rune struct {
 	hash         hash.Hash // This hash struct keeps the cumulative state with all added restrictions
 	hashBase     hash.Hash // This hash struct only keeps the base state
 	secLen       int
+	hashLen      int
 }
 
 // NewMasterRune creates a new master rune
@@ -350,6 +412,7 @@ func NewMasterRune(secret []byte, id, version string) (*Rune, error) {
 		uniqueId: id,
 		version:  version,
 		secLen:   len(secret),
+		hashLen:  len(append(secret, EndShastream(len(secret))...)),
 	}
 	if id != "" {
 		restr, err := UniqueIdRestriction(id, version)
@@ -389,6 +452,7 @@ func NewRuneFromAuthbase(authbase []byte, uniqueId, version string, restrictions
 		hashBase: hBase,
 		uniqueId: uniqueId,
 		version:  version,
+		hashLen:  64,
 	}
 	// unique_id restrictions first
 	if uniqueId != "" {
@@ -412,12 +476,12 @@ func NewRuneFromAuthbase(authbase []byte, uniqueId, version string, restrictions
 // AddRestrictions adds new restrictions to the rune
 func (r *Rune) AddRestriction(restriction Restriction) error {
 	r.Restrictions = append(r.Restrictions, restriction)
-	_, err := r.hash.Write([]byte(restriction.String()))
+	_, err := r.hash.Write(append([]byte(restriction.String()), EndShastream(r.hashLen+len([]byte(restriction.String())))...))
 	if err != nil {
 		return err
 	}
-	_, err = r.hash.Write(EndShastream(len(restriction.String())))
-	return err
+	r.hashLen += len(append([]byte(restriction.String()), EndShastream(r.hashLen+len([]byte(restriction.String())))...))
+	return nil
 }
 
 // AreRestrictionsMet tests the rune restrictions. If any fail, returns an error
@@ -463,19 +527,19 @@ func (r *Rune) IsRuneAuthorized(otherRune *Rune) bool {
 	hCopy := sha256.New()
 	unmarshaler := hCopy.(encoding.BinaryUnmarshaler)
 	unmarshaler.UnmarshalBinary(state)
-	totlen := r.secLen
+	totlen := r.secLen + len(EndShastream(r.secLen))
 	// update hash state with encoded restrictions
 	for _, restriction := range otherRune.Restrictions {
-		pad := EndShastream(totlen)
-		hCopy.Write(pad)
-		totlen += len(pad)
 		encodedRes := []byte(restriction.String())
 		hCopy.Write(encodedRes)
 		totlen += len(encodedRes)
+		pad := EndShastream(totlen)
+		hCopy.Write(pad)
+		totlen += len(pad)
 	}
 	newMarshal := hCopy.(encoding.BinaryMarshaler)
 	authbase, _ := newMarshal.MarshalBinary()
-	return bytes.Equal(otherRune.Authcode(), authbase[4:4+hCopy.Size()])
+	return bytes.Equal(otherRune.Authcode(), authbase[4:36])
 }
 
 // Check checks if a given rune is authorized by the parent rune and passes the given tests
@@ -497,7 +561,7 @@ func RuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error
 	authbase = append(authbase, shaPrefix...)
 	authbase = append(authbase, authcode...)
 	authbase = authbase[:100]
-	runeLength := len(authcode) + padlen64(len(authcode)) // may have to remove padlen64 of len(authcode)
+	runeLength := 64
 	for _, restr := range restrictions {
 		runeLength += len(restr.String())
 		runeLength += padlen64(runeLength)
@@ -519,6 +583,7 @@ func RuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error
 		hash:         h,
 		hashBase:     hBase,
 		Restrictions: restrictions,
+		hashLen:      runeLength,
 	}, nil
 }
 

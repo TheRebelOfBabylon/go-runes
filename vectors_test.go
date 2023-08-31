@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -111,6 +112,11 @@ func TestVectors(t *testing.T) {
 				variables := make(map[string]runes.Test)
 				for _, v := range vec[1:] {
 					parts := strings.SplitN(v, "=", -1)
+					// try to parse parts[1] into an integer
+					vInt, err := strconv.ParseInt(parts[1], 10, 64)
+					if err == nil {
+						variables[parts[0]] = runes.Test{Value: vInt, TestFunc: runes.StandardTestFunc}
+					}
 					variables[parts[0]] = runes.Test{Value: parts[1], TestFunc: runes.StandardTestFunc}
 				}
 				if err = rune1.AreRestrictionsMet(variables); err != nil {
@@ -128,6 +134,11 @@ func TestVectors(t *testing.T) {
 				variables := make(map[string]runes.Test)
 				for _, v := range vec[1:] {
 					parts := strings.SplitN(v, "=", -1)
+					// try to parse parts[1] into an integer
+					vInt, err := strconv.ParseInt(parts[1], 10, 64)
+					if err == nil {
+						variables[parts[0]] = runes.Test{Value: vInt, TestFunc: runes.StandardTestFunc}
+					}
 					variables[parts[0]] = runes.Test{Value: parts[1], TestFunc: runes.StandardTestFunc}
 				}
 				if err = rune1.AreRestrictionsMet(variables); err == nil {
