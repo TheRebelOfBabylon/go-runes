@@ -1,6 +1,8 @@
 # go-runes
 Runes for authentication (like macaroons only simpler) ported to Go. The original Python implementation is found [here](https://github.com/rustyrussell/runes)
 
+I'm by no means an expert in cryptography so please, if you see something bad, PRs are welcome.
+
 ## What are Runes?
 
 Runes are like cookies for authorization but extra restrictions can be added by clients and shared with others. Those runes can then still be authenticated by the server.
