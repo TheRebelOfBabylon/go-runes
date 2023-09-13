@@ -413,6 +413,11 @@ func (r *Rune) IsRuneAuthorized(otherRune *Rune) bool {
 	return bytes.Equal(otherRune.Authcode(), authbase[4:4+hCopy.Size()])
 }
 
+// Clone creates a copy of the given rune
+func (r *Rune) Clone() (*Rune, error) {
+	return NewRuneFromEncodedString(r.Encode())
+}
+
 // NewRuneFromAuthcode creates a new rune from a given authcode and a list of restrictions
 func NewRuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error) {
 	// append sha prefix and then unmarshal sha256 state into hash struct
