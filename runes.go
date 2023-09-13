@@ -554,6 +554,11 @@ func (r *Rune) Check(encodedRune string, tests map[string]Test) error {
 	return newRune.AreRestrictionsMet(tests)
 }
 
+// Clone creates a copy of the current rune
+func (r *Rune) Clone() (*Rune, error) {
+	return RuneFromEncodedString(r.Encode())
+}
+
 // RuneFromAuthcode parses a rune from a given authcode and a list of restrictions
 func RuneFromAuthcode(authcode []byte, restrictions []Restriction) (*Rune, error) {
 	// append sha prefix and then unmarshal sha256 state into hash struct
